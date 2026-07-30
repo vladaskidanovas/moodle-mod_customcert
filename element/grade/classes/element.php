@@ -79,6 +79,19 @@ class element extends \mod_customcert\element {
      * @return string the json encoded array
      */
     public function save_unique_data($data) {
+        global $COURSE;
+
+        // Only allow grade items that are actually offered to this course in the edit form,
+        // to prevent a tampered request from pointing this element at a grade item or
+        // course module belonging to a different course.
+        // Note: array_keys() normalises numeric string keys (e.g. a course module id) to
+        // integers, so cast everything to string before comparing.
+        $allowed = array_map('strval', array_keys(\mod_customcert\element_helper::get_grade_items($COURSE)));
+        $allowed[] = (string) CUSTOMCERT_GRADE_COURSE;
+        if (!in_array((string) $data->gradeitem, $allowed, true)) {
+            throw new \moodle_exception('invalidgradeitem', 'customcertelement_grade');
+        }
+
         // Array of data we will be storing in the database.
         $arrtostore = [
             'gradeitem' => $data->gradeitem,
@@ -122,17 +135,32 @@ class element extends \mod_customcert\element {
                 );
             } else if (strpos($gradeitem, 'gradeitem:') === 0) {
                 $gradeitemid = substr($gradeitem, 10);
-                $grade = \mod_customcert\element_helper::get_grade_item_info(
-                    $gradeitemid,
-                    $gradeformat,
-                    $user->id
-                );
+                // Ensure the grade item actually belongs to this certificate's own course
+                // before fetching the grade, in case the stored value points elsewhere
+                // (e.g. tampered request, or leftover data from a restore on another site).
+                $gi = \grade_item::fetch(['id' => $gradeitemid]);
+                if (!$gi || (int) $gi->courseid !== (int) $courseid) {
+                    $grade = false;
+                } else {
+                    $grade = \mod_customcert\element_helper::get_grade_item_info(
+                        $gradeitemid,
+                        $gradeformat,
+                        $user->id
+                    );
+                }
             } else {
-                $grade = \mod_customcert\element_helper::get_mod_grade_info(
-                    $gradeitem,
-                    $gradeformat,
-                    $user->id
-                );
+                // Ensure the course module actually belongs to this certificate's own course
+                // before fetching the grade.
+                $cm = get_coursemodule_from_id('', $gradeitem, 0, false, IGNORE_MISSING);
+                if (!$cm || (int) $cm->course !== (int) $courseid) {
+                    $grade = false;
+                } else {
+                    $grade = \mod_customcert\element_helper::get_mod_grade_info(
+                        $gradeitem,
+                        $gradeformat,
+                        $user->id
+                    );
+                }
             }
 
             if ($grade) {

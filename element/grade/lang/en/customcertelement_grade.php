@@ -30,6 +30,7 @@ $string['gradeitem_help'] = 'The grade item you wish to display the grade of.';
 $string['gradeletter'] = 'Letter';
 $string['gradepercent'] = 'Percentage';
 $string['gradepoints'] = 'Points';
+$string['invalidgradeitem'] = 'The selected grade item is not valid for this course.';
 $string['pluginname'] = 'Grade';
 $string['previewgrade'] = 'Preview grade';
 $string['privacy:metadata'] = 'The Grade plugin does not store any personal data.';
